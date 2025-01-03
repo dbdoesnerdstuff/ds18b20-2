@@ -1,9 +1,5 @@
 # DS18B20 temperature sensor
-[![Build Status](https://travis-ci.org/fuchsnj/ds18b20.svg?branch=master)](https://travis-ci.org/fuchsnj/ds18b20)
-[![crates.io](https://img.shields.io/crates/v/ds18b20.svg)](https://crates.io/crates/ds18b20)
-[![API](https://docs.rs/ds18b20/badge.svg)](https://docs.rs/ds18b20)
-
-A Rust [DS18B20](https://www.taydaelectronics.com/datasheets/A-072.pdf) temperature sensor driver for [embedded-hal](https://github.com/rust-embedded/embedded-hal) 
+A Rust [DS18B20](https://www.taydaelectronics.com/datasheets/A-072.pdf) temperature sensor driver for [embedded-hal](https://github.com/rust-embedded/embedded-hal) 1.0.0.
 
 This device uses the 1-wire protocol, and requires using the [one-wire-bus](https://crates.io/crates/one-wire-bus)
 library for the 1-wire bus.
@@ -12,8 +8,8 @@ library for the 1-wire bus.
 
 ### Get Temperature
 ```rust
-fn get_temperature<P, E>(
-    delay: &mut (impl DelayUs<u16> + DelayMs<u16>),
+pub fn get_temperature<P, E>(
+    delay: &mut impl DelayNs,
     tx: &mut impl Write,
     one_wire_bus: &mut OneWire<P>,
 ) -> OneWireResult<(), E>
@@ -22,7 +18,7 @@ fn get_temperature<P, E>(
         E: Debug
 {
     // initiate a temperature measurement for all connected devices
-    ds18b20::start_simultaneous_temp_measurement(one_wire_bus, delay)?;
+    ds18b20_2::start_simultaneous_temp_measurement(one_wire_bus, delay)?;
 
     // wait until the measurement is done. This depends on the resolution you specified
     // If you don't know the resolution, you can obtain it from reading the sensor data,
@@ -34,7 +30,7 @@ fn get_temperature<P, E>(
     loop {
         if let Some((device_address, state)) = one_wire_bus.device_search(search_state.as_ref(), false, delay)? {
             search_state = Some(state);
-            if device_address.family_code() != ds18b20::FAMILY_CODE {
+            if device_address.family_code() != ds18b20_2::FAMILY_CODE {
                 // skip other devices
                 continue;
             }
@@ -43,7 +39,11 @@ fn get_temperature<P, E>(
 
             // contains the read temperature, as well as config info such as the resolution used
             let sensor_data = sensor.read_data(one_wire_bus, delay)?;
-            writeln!(tx, "Device at {:?} is {}°C", device_address, sensor_data.temperature);
+            //writeln!(tx, "Device at {:?} is {}°C", device_address, sensor_data.temperature);
+            //Original above, patched below to fix unhandled result issue
+            if let Err(e) = writeln!(tx, "Device at {:?} is {}°C", device_address, sensor_data.temperature) {
+                println!("Writing error: {}", e.to_string());   
+            }
         } else {
             break;
         }
@@ -54,8 +54,8 @@ fn get_temperature<P, E>(
 
 ### Configuration
 ```rust
-fn test_config<P, E>(
-    delay: &mut (impl DelayUs<u16> + DelayMs<u16>),
+pub fn test_config<P, E>(
+    delay: &mut impl DelayNs,
     tx: &mut impl Write,
     one_wire_bus: &mut OneWire<P>,
 ) -> OneWireResult<(), E>
@@ -71,7 +71,11 @@ fn test_config<P, E>(
 
         // read the initial config values (read from EEPROM by the device when it was first powered)
         let initial_data = device.read_data(one_wire_bus, delay)?;
-        writeln!(tx, "Initial data: {:?}", initial_data);
+        //writeln!(tx, "Initial data: {:?}", initial_data);
+        //^^^ old version. possible solution below
+        if let Err(e) = writeln!(tx, "Initial data: {:?}", initial_data) {
+            println!("Writing error: {}", e.to_string());   
+        }
 
         let resolution = initial_data.resolution;
 
@@ -80,7 +84,11 @@ fn test_config<P, E>(
 
         // confirm the new config is now in the scratchpad memory
         let new_data = device.read_data(one_wire_bus, delay)?;
-        writeln!(tx, "New data: {:?}", new_data);
+        //writeln!(tx, "New data: {:?}", new_data);
+        //^^^ same problem with Err here.
+        if let Err(e) = writeln!(tx, "New data: {:?}", new_data) {
+            println!("Writing error: {}", e.to_string());   
+        }
 
         // save the config to EEPROM to save it permanently
         device.save_to_eeprom(one_wire_bus, delay)?;
@@ -88,7 +96,12 @@ fn test_config<P, E>(
         // read the values from EEPROM back to the scratchpad to verify it was saved correctly
         device.recall_from_eeprom(one_wire_bus, delay)?;
         let eeprom_data = device.read_data(one_wire_bus, delay)?;
-        writeln!(tx, "EEPROM data: {:?}", eeprom_data);
+        //writeln!(tx, "EEPROM data: {:?}", eeprom_data);
+        //^^^Err problem here too.
+        if let Err(e) = writeln!(tx, "EEPROM data: {:?}", eeprom_data) {
+            println!("Writing error: {}", e.to_string());   
+        }
+
     }
     Ok(())
 }
