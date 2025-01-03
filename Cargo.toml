@@ -13,5 +13,5 @@ A Rust DS18B20 temperature sensor driver for [embedded-hal](https://github.com/r
 """
 
 [dependencies]
-one-wire-bus-2 = {path = "../one-wire-bus-2"}
+one-wire-bus-2 = "0.1.1"
 embedded-hal = "1.0.0"
